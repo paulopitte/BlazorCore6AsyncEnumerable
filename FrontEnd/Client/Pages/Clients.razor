@@ -1,0 +1,68 @@
+﻿@page "/clients"
+@using Contract.Model
+@using System.Text.Json
+@inject HttpClient Http
+
+<PageTitle>Clientes</PageTitle>
+
+<h1>Clientes</h1>
+<button class="btn btn-primary" @onclick="@(()=>GetClients("/"))">Carregar sem Async Stream</button>
+<button class="btn btn-primary" @onclick="@(()=>GetClients("/stream"))">Carregar com Async Stream</button>
+<center>Exemplo de Carregamento pela nova featura IAsyncEnumerable stream</center><br />
+@if (_clients == null)
+{
+    <p><em>...</em></p>
+}
+else if (!_clients.Any())
+{
+    <p><em>Carregando...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nome</th>
+                <th>Email</th>
+                <th>Foto</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var pessoa in _clients)
+            {
+                <tr>
+                    <td>@pessoa.Name</td>
+                    <td>@pessoa.Email</td>
+                    <td><img src="@pessoa.Image" alt="" width="50" /></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+
+    private List<Client> _clients = null!;
+
+    private async Task GetClients(string path)
+    {
+        _clients = new List<Client>();
+
+        var response = await Http.GetAsync(path, HttpCompletionOption.ResponseHeadersRead);
+        response.EnsureSuccessStatusCode();
+        var stream = await response.Content.ReadAsStreamAsync();
+        var clients = JsonSerializer.DeserializeAsyncEnumerable<Client>(
+            stream,
+            new JsonSerializerOptions 
+            {
+                PropertyNameCaseInsensitive = true,  
+                DefaultBufferSize = 5 
+            });
+
+        await foreach (var client in clients!)
+        {
+            _clients.Add(client);
+            StateHasChanged();
+        }
+    }
+}
